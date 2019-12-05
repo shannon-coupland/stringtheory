@@ -50,6 +50,7 @@
                         <ul class="dropdown-menu">
                             <li role="presentation"><a href="{{ url_for('patterns') }}">All Patterns</a></li>
                             <li role="presentation"><a href="{{ url_for('savedPatterns') }}">My Library</a></li>
+                            <li role="presentation"><a href="{{ url_for('patterns') }}">My Uploads</a></li>
                             <li role="presentation"><a href="{{ url_for('upload') }}">Upload Pattern</a></li>
                         </ul>
                 </li>
@@ -58,6 +59,9 @@
                           {{current_user.username}} <span class="caret"></span>
                         </a>
                         <ul class="dropdown-menu">
+                            {% if current_user.username == 'admin' %}
+                            <li role="presentation"><a href="{{ url_for('manage') }}"">Manage Site</a></li>
+                            {% endif %}
                             <li role="presentation"><a href={{ '/profile/'~current_user.username }}>My Profile</a></li>
                             <li role="presentation"><a href="{{ url_for('profileForm') }}">Search Profiles</a></li>
                             <li role="presentation"><a href="{{ url_for('logout') }}">Logout</a></li>

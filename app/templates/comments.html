@@ -4,7 +4,7 @@
 <h1>Comments on {{p.name}}</h1>
 
 
-    {% for key in usersComments %}
+    {% for c in p.comments %}
         <div class="media">
             <div class="media-left">
                 </div>
@@ -12,12 +12,12 @@
                         <div class="container">
                             <div class="row">
                                 <div class="col-md-3">
-                                    <h4 class="media-heading">{{ usersComments[key].author.username }}</h4>
-                                    <p>{{ usersComments[key].body }}</p>
+                                    <h4 class="media-heading">{{ c.author.username }}</h4>
+                                    <p>{{ c.body }}</p>
                                 </div>
                             <div class="col-md-1">
-                                {% if current_user.id == usersComments[key].user_id or current_user.username == 'admin'%}
-                                    <form style="display: inline-block;" action={{"/commentDelete/"~usersComments[key].id}}><input class="form-control" type="submit" name="delete" value="delete"></form>
+                                {% if current_user.id == c.user_id or current_user.username == 'admin'%}
+                                    <form style="display: inline-block;" action={{"/commentDelete/"~c.id}}><input class="form-control" type="submit" name="delete" value="delete"></form>
                                 {% endif %}
                         </div>
                     </div>
@@ -28,7 +28,7 @@
     {% endfor %}
 
 <form action={{"/commentUpload/"~p.id}} method="post">
-    <input class="form-control input-sm" type="text" name="body"><br>
+    <input class="form-control input-sm" type="text" name="body" required><br>
     <input class="btn btn-primary" style="display: inline-block;" type="submit" name="submit" value="post">
 </form>
 

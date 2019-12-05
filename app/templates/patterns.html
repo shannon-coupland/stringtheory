@@ -3,6 +3,13 @@
 {% block app_content %}
 {% if not saved %}
     <h1>Patterns</h1>
+    {% if patterns|length == 0 %}
+        {% if current_user.is_authenticated %}
+            <p>No patterns yet! Want to <a href="{{url_for('upload')}}">upload</a> one?</p>
+        {% else %}
+        <p>No patterns yet! Want to <a href="{{url_for('login')}}">log in</a> and upload one?</p>
+        {% endif %}
+    {% endif %}
 {% else %}
     <h1>Saved Patterns</h1>
     {% if patterns|length == 0 %}
@@ -20,21 +27,21 @@
                                     {% for p in group %}
                                     <div class="col-sm-6 col-md-3">
                                           <div class="thumbnail">
-                                            {% if not p.image_filename == "" %}
+                                            {% if not p.image_filename == None %}
                                                 <img src= {{ url_for('static', filename = 'images/'~p.image_filename) }} alt={{p.image_filename}}>
                                             {% endif %}
                                             <div class="caption">
                                               <h4>{{p.name}}</h4>
-                                            {% if not p.description == "" %}
+                                            {% if not p.description == None %}
                                               <small>{{p.description}}</small>
                                                 <br><br>
                                             {% endif %}
-                                              <small>Tags: </small>
-                                                {% for tag in p.tags %}
-                                                    <small>{{tag.label}}</small>
-                                                {% endfor %}
+
+                                            {% if not p.tags|length == 0 %}
+                                              <small>• {% for tag in p.tags %}{{globalMap[tag.label]}} • {% endfor %}</small>
                                                 <br>
-                                                
+                                            {% endif %}
+
                                               <form style="display: inline-block;" action="{{'/download/'~p.id}}"><button class="btn btn-default btn-sm download" type="submit" name="download" value="download"><span class="glyphicon glyphicon-save" aria-hidden="true"></span></button></form>
                                                 {% if current_user.is_authenticated %}
                                                     {% if (p.user_id == current_user.id or current_user.username == 'admin') %}
@@ -45,7 +52,7 @@
                                                     {% endif %}
                         
                                                     <form style="display: inline-block;" action="{{'/comments/'~p.id}}"><button class="btn btn-default btn-sm comments" type="submit" name="comments" value="comments"><span class="glyphicon glyphicon-comment" aria-hidden="true"></span></button></form>
-                                                    {% if (savedDict[p.id] == "s") %}
+                                                    {% if (p in current_user.saved_patterns) %}
                                                     <form style="display: inline-block;" action="{{'/remove/'~p.id}}"><button class="btn btn-default btn-sm remove" type="submit" name="remove" value="remove from library"><span class="glyphicon glyphicon-minus" aria-hidden="true"></span></button></form>
                                                     {% else %}
                                                     <form style="display: inline-block;" action="{{'/add/'~p.id}}"><button class="btn btn-default btn-sm add" type="submit" name="add" value="add to library"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span></button></form>

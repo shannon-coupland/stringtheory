@@ -1,6 +1,6 @@
 from flask import render_template, flash, redirect, url_for, request, send_file
-from app import app, ALLOWED_EXTENSIONS
-from app.forms import LoginForm, RegistrationForm#, PatternForm, TagForm #, UploadForm
+from app import app, ALLOWED_PATTERN_EXTENSIONS, ALLOWED_IMG_EXTENSIONS, globalMap, globalDict
+from app.forms import LoginForm, RegistrationForm
 from flask_login import current_user, login_user, logout_user, login_required
 from app.models import User, Pattern, Tag, Comment
 from werkzeug.urls import url_parse
@@ -14,24 +14,6 @@ from io import BytesIO
 #https://www.youtube.com/watch?v=TLgVEBuQURA (file downloading)
 #https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world (Flask tutorial)
 
-#General Globals and Functions***********************************************************************
-globalLabels = {'Craft': ['Knit','Crochet'], \
-            'Difficulty': ['Easy','Intermediate','Advanced'], \
-            'Item': ['Scarf','Sweater','Hat','Toy','Blanket','Pillow','Other'], 
-            'Knitting Techniques': ['Cables','Lace','Double Knitting','Colorwork','Textured'], \
-            'Crochet Techniques': ['Single Crochet','Magic Ring']} \
-
-globalDict = {'craft': ['knit','crochet'], \
-            'difficulty': ['easy','intermediate','advanced'], \
-            'item': ['scarf','sweater','hat','toy','blanket','pillow','other'], 
-            'knittingtechniques': ['cables','lace','doubleknitting','colorwork','textured'], \
-            'crochettechniques': ['singlecrochet','magicring']} \
-
-globalMap = {}
-for i in globalLabels.keys():
-    globalMap[i.replace(" ", "").lower()] = i
-    for j in globalLabels[i]:
-        globalMap[j.replace(" ", "").lower()] = j
 
 #Takes a list and creates a list of lists, each with up to 3 elements
 def groupInThrees(listy):
@@ -44,9 +26,26 @@ def groupInThrees(listy):
     return pattsInThrees
 
 #Filters input through permitted file extensions
-def allowed_file(filename):
+def allowed_pattern(filename):
     return '.' in filename and \
-    filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    filename.rsplit('.', 1)[1].lower() in ALLOWED_PATTERN_EXTENSIONS
+
+def allowed_img(filename):
+    return '.' in filename and \
+    filename.rsplit('.', 1)[1].lower() in ALLOWED_IMG_EXTENSIONS
+
+#Store any tags not in database
+def storeTags(tags):
+    for tag in tags:
+        if Tag.query.filter_by(label=tag).first() is None:
+            db.session.add(Tag(label=tag))
+    db.session.commit()
+
+def tagLabelsFromObjects(listy):
+    tags = []
+    for tag in listy:
+        tags.append(tag.label)
+    return tags
 
 #Routes***************************************************************************
 @app.route('/')
@@ -72,6 +71,8 @@ def register():
 @app.route('/profile/<username>', methods=['GET','POST'])
 def profile(username):
     user =  User.query.filter_by(username=username).first()
+    if user == None:
+        return redirect(url_for('profileForm'))
     userId = user.id
     comments = Comment.query.filter_by(user_id=userId).all()
     patterns = User.query.filter_by(username=username).first().uploaded_patterns
@@ -87,7 +88,7 @@ def profile(username):
             else:
                 dictionary[p.id] = "n"
 
-    return render_template('profile.html', title='My Profile', savedDict=dictionary, comments=comments, patterns=groupInThrees(patterns), user=user)
+    return render_template('profile.html', title=username+'Profile', savedDict=dictionary, comments=comments, patterns=groupInThrees(patterns), user=user)
 
 #Displays profile search form
 @app.route('/profileForm')
@@ -98,7 +99,6 @@ def profileForm():
 @app.route('/profileSearch', methods=['GET','POST'])
 def profileSearch():
     f = request.form
-    print (f)
     username = request.form['username']
     user = User.query.filter_by(username=username).first()
     if user == None:
@@ -127,8 +127,10 @@ def login():
 #Logout route
 @app.route('/logout')
 def logout():
-    logout_user()
-    return redirect(url_for('index'))
+    if current_user.is_authenticated:
+        logout_user()
+    return redirect(url_for('login'))
+    
 
 #Resources page route (returns calendar)
 @app.route('/resources')
@@ -140,51 +142,58 @@ def resources():
 #Renders upload form
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
+    if not current_user.is_authenticated:
+        return redirect(url_for('login'))
     return render_template('upload.html', title='Upload Pattern', edit=False, globalDict = globalDict, globalMap=globalMap)
 
 #Receives upload form data
 @app.route('/uploadForm', methods=['GET', 'POST'])
-def uploadFile():
-    print('entered /upload')
+def uploadForm():
     if not current_user.is_authenticated:
-        return redirect(url_for('patterns'))
+        return redirect(url_for('login'))
     
     file = request.files['file']
     image = request.files['image']
     name = html.unescape(request.form['name'])
     description = html.unescape(request.form['description'])
     filename = secure_filename(file.filename)
+    imagename = secure_filename(image.filename)
 
-    #Create list of tags from form response
+    #Create list of tags from form response, store in database if not yet there
     tags = []
     formVals = request.form
     for key in formVals.keys():
-        tags.append(key)
-    tags.remove('name')
-    tags.remove('description')
-    
-    #Store any tags not in database
-    for tag in tags:
-        if Tag.query.filter_by(label=tag).first() is None:
-            db.session.add(Tag(label=tag))
-    db.session.commit()
+        if key in globalDict:
+            tags.append(key)
+    # tags.remove('name')
+    # tags.remove('description')
+    storeTags(tags)
 
     #If filename is good, upload new pattern to database
-    if allowed_file(filename):
-        uploadToDB = Pattern(name=name, file=file.read(), filename=filename, owner=current_user, description=description)
+    if allowed_pattern(filename):
+        uploadToDB = Pattern(file=file.read(), filename=filename, owner=current_user)
+
+        if ('name' in request.files):
+            uploadToDB.name = name
+        else:
+            array = file.filename.split('.')
+            uploadToDB.name = array[0]
+
+        if ('description' in request.files):
+            uploadToDB.description = description
+
+        #Upload cover image (if attached) to filesystem
+        if (('image' in request.files) and allowed_img(imagename)):
+            array = imagename.split('.')
+            newFilename = str(Pattern.query.filter_by(filename=filename).first().id) + "." + array[1]
+            image.save(os.path.join(app.config['UPLOAD_FOLDER'], newFilename))
+            uploadToDB.image_filename = newFilename
+        # else:
+        #     uploadToDB.image_filename = ""
+
         for tag in tags:
             t = Tag.query.filter_by(label=tag).first()
             uploadToDB.tags.append(t)
-
-        #Upload cover image (if attached) to filesystem
-        if (('image' in request.files) and (not image.filename == '')):
-            array = image.filename.split('.')
-            newFilename = str(Pattern.query.filter_by(filename=filename).first().id) + "." + array[1]
-            print(newFilename)
-            image.save(os.path.join(app.config['UPLOAD_FOLDER'], newFilename))
-            uploadToDB.image_filename = newFilename
-        else:
-            uploadToDB.image_filename = ""
 
         #put new pattern in database
         db.session.add(uploadToDB)
@@ -200,72 +209,47 @@ def patterns():
     patternIntersection = allPatts
         
     #Get list of saved patterns:
-    saved = []
-    dictionary = {}
-    if (current_user.is_authenticated):
-        saved = User.query.filter_by(id=current_user.id).first().saved_patterns
-
-        for p in patternIntersection:
-            if p in saved:
-                dictionary[p.id] = "s"
-            else:
-                dictionary[p.id] = "n"
+    # saved = []
+    # if (current_user.is_authenticated):
+    #     saved = User.query.filter_by(id=current_user.id).first().saved_patterns
 
     return render_template('patterns.html', title='Patterns', patterns=groupInThrees(patternIntersection), \
-        savedDict=dictionary, globalDict=globalDict, globalMap=globalMap, saved=False)
+        globalDict=globalDict, globalMap=globalMap, saved=False)
 
 #Renders patterns.html with patterns in library
 @app.route('/savedPatterns', methods=['GET', 'POST'])
 def savedPatterns():
-    patts = db.session.query(Pattern)
-    allPatts = patts.all()
-    patternIntersection = allPatts
-        
+    if not current_user.is_authenticated:
+        redirect(url_for('patterns'))
+
     #Get list of saved patterns:
     saved = []
-    dictionary = {}
     if (current_user.is_authenticated):
         saved = User.query.filter_by(id=current_user.id).first().saved_patterns
 
-        for p in patternIntersection:
-            if p in saved:
-                dictionary[p.id] = "s"
-            else:
-                dictionary[p.id] = "n"
-
     return render_template('patterns.html', title='Patterns', patterns=groupInThrees(saved), \
-        savedDict=dictionary, globalDict=globalDict, globalMap=globalMap, saved=True)
+        globalDict=globalDict, globalMap=globalMap, saved=True)
 
 #Renders patterns.html with appropriate filters
 @app.route('/filter/<save>', methods=['GET', 'POST'])
 def filter(save):
     tagsList = []
-    f = request.form
-    for key in f.keys():
+    checkedTags = request.form
+    for key in checkedTags.keys():
         tagsList.append(key)
         if Tag.query.filter_by(label=key).first() is None:
             db.session.add(Tag(label=key))
     db.session.commit()
+
     q = db.session.query(Pattern)
     allPatts = q.all()
     if (save == 's'):
         q = q.filter(Pattern.users.any(User.username == current_user.username))
 
-    savedPatts = []
-    dictionary = {}
-    if (current_user.is_authenticated):
-        savedPatts = User.query.filter_by(id=current_user.id).first().saved_patterns
-        
-        for p in allPatts:
-            if p in savedPatts:
-                dictionary[p.id] = "s"
-            else:
-                dictionary[p.id] = "n"
-
     for tag in tagsList:
         q = q.filter(Pattern.tags.any(Tag.label == tag))
 
-    viewedPatts = q.all()    
+    viewedPatts = q.all()
     filtered = True
     if(len(tagsList) == 0):
         filtered = False
@@ -276,18 +260,19 @@ def filter(save):
         onSaved = True
 
     return render_template('patterns.html', title='Patterns', patterns=groupInThrees(viewedPatts), \
-        savedDict=dictionary, globalDict=globalDict, filtered=filtered, tags=tagsList, globalMap=globalMap, saved=onSaved)
+        globalDict=globalDict, filtered=filtered, tags=tagsList, globalMap=globalMap, saved=onSaved)
 
 #Receives signal from edit button and renders edit form
 @app.route('/edit/<pattId>', methods=['GET', 'POST'])
 def edit(pattId):
     if not current_user.is_authenticated:
-        return redirect(url_for('patterns'))
+        return redirect(url_for('login'))
+
     p = Pattern.query.get(pattId)
-    tagObjects = p.tags
-    tags = []
-    for tag in tagObjects:
-        tags.append(tag.label)
+    if not (current_user.id == p.user_id or current_user.username == "admin"):
+        return redirect(url_for('patterns'))
+
+    tags = tagLabelsFromObjects(p.tags)
     
     return render_template('upload.html', title='Edit Pattern', globalDict=globalDict, edit=True, p=p, tags=tags, globalMap=globalMap)
 
@@ -295,23 +280,27 @@ def edit(pattId):
 @app.route('/editForm/<pattId>', methods=['GET', 'POST'])
 def editForm(pattId):
     if not current_user.is_authenticated:
-        return redirect(url_for('patterns'))
-    f = request.form
-    print (f)
+        return redirect(url_for('login'))
+
     p = Pattern.query.get(pattId)
-    p.tags = []
-    name = ""
-    description = ""
+    if not (current_user.id == p.user_id or current_user.username == "admin"):
+        return redirect(url_for('patterns'))
+
+    f = request.form
+    tags = []
+
     for key in f.keys():
         if key == 'name':
-            name = f[key]
+            p.name = f[key]
         elif key == 'description':
-            description = f[key]
+            p.description = f[key]
         else:
-            p.tags.append(Tag.query.filter_by(label=key).first())
+            tags.append(f[key])
 
-    p.name = name
-    p.description = description
+        storeTags(tags)
+        p.tags = []
+        for t in tags:
+            p.tags.append(Tag.query.filter_by(label=t).first())
     db.session.commit()
 
     return redirect(url_for('patterns'))
@@ -320,13 +309,20 @@ def editForm(pattId):
 @app.route('/delete/<pattId>', methods = ['GET', 'POST'])
 def delete(pattId):
     if not current_user.is_authenticated:
-        return redirect(url_for('patterns'))
+        return redirect(url_for('login'))
+
     p = Pattern.query.get(pattId)
+    if not (current_user.id == p.user_id or current_user.username == "admin"):
+        return redirect(url_for('patterns'))
+
     comments = Comment.query.filter_by(pattern_id=pattId).all()
     for c in comments:
         db.session.delete(c)
-    if (not p.image_filename == ''):
-        os.unlink(os.path.join(app.config['UPLOAD_FOLDER'], p.image_filename))
+    
+    pathToImage = os.path.join(app.config['UPLOAD_FOLDER'], p.image_filename)
+    if (os.path.exists(pathToImage)):
+        os.unlink(pathToImage)
+
     db.session.delete(p)
     db.session.commit()
     return redirect(url_for('patterns'))
@@ -335,9 +331,10 @@ def delete(pattId):
 @app.route('/add/<pattId>', methods=['GET', 'POST'])
 def add(pattId):
     if not current_user.is_authenticated:
-        return redirect(url_for('patterns'))
-    p = Pattern.query.filter_by(id=pattId).first()
-    user = User.query.filter_by(id=current_user.id).first()
+        return redirect(url_for('login'))
+
+    p = Pattern.query.get(pattId)
+    user = User.query.get(current_user.id)
     if not p in user.saved_patterns:
         user.saved_patterns.append(p)
         db.session.commit()
@@ -347,9 +344,10 @@ def add(pattId):
 @app.route('/remove/<pattId>', methods=['GET', 'POST'])
 def remove(pattId):
     if not current_user.is_authenticated:
-        return redirect(url_for('patterns'))
+        return redirect(url_for('login'))
+
     p = Pattern.query.get(pattId)
-    user = User.query.filter_by(id=current_user.id).first()
+    user = User.query.get(current_user.id)
     if p in user.saved_patterns:
         user.saved_patterns.remove(p)
         db.session.commit()
@@ -367,14 +365,14 @@ def comments(pattId):
     if not current_user.is_authenticated:
         return redirect(url_for('patterns'))
     p = Pattern.query.get(pattId)
-    comments = p.comments
-    usersComments = {}
-    i = 0
-    for c in comments:
-        name = User.query.get(c.user_id).username
-        usersComments[i] = c
-        i = i + 1
-    return render_template('comments.html', title="Pattern Info", p=p, usersComments=usersComments)
+    # comments = p.comments
+    # usersComments = {}
+    # i = 0
+    # for c in comments:
+    #     name = User.query.get(c.user_id).username
+    #     usersComments[i] = c
+    #     i = i + 1
+    return render_template('comments.html', title="Pattern Info", p=p)#, comments=p.comments)
 
 #Detects comment submission, adds to database, and redirects to comments of current pattern
 @app.route('/commentUpload/<pattId>', methods=['GET', 'POST'])
@@ -383,10 +381,10 @@ def commentUpload(pattId):
         return redirect(url_for('patterns'))
     body = request.form['body']
     p = Pattern.query.get(pattId)
-    u = User.query.get(current_user.id)
+    # u = User.query.get(current_user.id)
     c = Comment(body=body)
     p.comments.append(c)
-    u.comments.append(c)
+    current_user.comments.append(c)
     db.session.add(c)
     db.session.commit()
     return redirect('/comments/'+str(pattId))
@@ -394,10 +392,24 @@ def commentUpload(pattId):
 #Detects comment's delete submission, removes from DB, and redirects to comments of current pattern
 @app.route('/commentDelete/<commentId>', methods=['GET', 'POST'])
 def commentDelete(commentId):
-    pattId = Comment.query.get(commentId).pattern_id
-    db.session.delete(Comment.query.get(commentId))
+    if not current_user.is_authenticated:
+        return redirect(url_for('login'))
+
+    c = Comment.query.get(commentId)
+    if not (current_user.id == c.author or current_user.username == "admin"):
+        return redirect(url_for('patterns'))
+    
+    pattId = c.pattern_id
+    db.session.delete(c)
     db.session.commit()
     return redirect('/comments/'+str(pattId))
+
+@app.route('/manage')
+def manage():
+    if not (current_user.is_authenticated and current_user.username == "admin"):
+        return redirect(url_for('index'))
+
+    return render_template('manage.html', title="Manage")
 
 
 #Routes for knitting/crochet tutorials

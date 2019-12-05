@@ -4,7 +4,7 @@
     <h1>{{ title }}</h1>
     <form {% if edit %}action={{'/editForm/'~p.id}}{% else %}action='/uploadForm'{% endif %} method="post" enctype="multipart/form-data">
 
-        <h4>Pattern Title</h4> <input class="form-control" type="text" name="name" {% if edit %}value='{{p.name}}'{% endif %} required><br>
+        <h4>Pattern Title</h4> <input class="form-control" type="text" name="name" {% if edit %}value='{{p.name}}' required{% endif %}><br>
         {% if not edit %}
         <h4>File Upload (.txt, .pdf, .png, .jpg, .jpeg)</h4> <input class="form-control-file" type="file" name="file" required><br><br>
         <h4>Cover Image (optional; .png, .jpg, .jpeg)</h4><input class="form-control-file" type="file" name="image"><br><br>
