@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block app_content %}
+    <h1>Search Profiles</h1>
+    <p>Enter a String Theory website username below to see their profile!</p>
+
+    {% if err %}
+        <p>That user doesn't exist! Please try again.</p>
+    {% endif %}
+
+    <form action="/profileSearch" method="post">
+        <input class="form-control input-sm" type="text" name="username"><br>
+        <input class="btn btn-primary" type="submit" value="search">
+    </form>
+
+{% endblock %}

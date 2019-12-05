@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block app_content %}
+    <h1>{{ title }}</h1>
+    <form {% if edit %}action={{'/editForm/'~p.id}}{% else %}action='/uploadForm'{% endif %} method="post" enctype="multipart/form-data">
+
+        <h4>Pattern Title</h4> <input class="form-control" type="text" name="name" {% if edit %}value='{{p.name}}'{% endif %} required><br>
+        {% if not edit %}
+        <h4>File Upload (.txt, .pdf, .png, .jpg, .jpeg)</h4> <input class="form-control-file" type="file" name="file" required><br><br>
+        <h4>Cover Image (optional; .png, .jpg, .jpeg)</h4><input class="form-control-file" type="file" name="image"><br><br>
+        {% endif %}
+        <h4>Description (optional; limit 1000 characters)</h4><input class="input-lg form-control" type="text" name="description" {% if (edit) and (not p.description == None) %}value='{{p.description}}'{% endif %}><br><br>
+        
+        <h4>Tags</h4>
+                    {% if filtered %}
+                        <span>Filtered by: </span>
+                        {% for tag in tags %}
+                            <span>{{tag}}</span>
+                        {% endfor %}
+                    {% endif %}
+                    {% if saved %}
+                    <form action="/filter/s" method="post">
+                    {% else %}
+                    <form action="/filter/n" method="post">
+                    {% endif %}
+                    {% for key in globalDict %}
+                        <div style="display: inline-block;">
+                            <h4>{{globalMap[tag]}}{{ globalMap[key] }}</h4>
+                            {% for tag in globalDict[key] %}
+                                <input type="checkbox" id={{tag}} name={{tag}} value={{tag}} {% if tag in tags %}checked{% endif %}>
+                                <label for={{tag}}>{{globalMap[tag]}}</label><br>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                    <br><br>
+                    <input type="submit" class="btn btn-primary" {% if edit %}value="save"{% else %}value="upload"{% endif %} />
+                </form>
+            <br><br>
+    </form>
+    <br><br><br><br><br><br><br><br>
+{% endblock %}

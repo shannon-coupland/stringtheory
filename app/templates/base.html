@@ -1,0 +1,85 @@
+{% extends 'bootstrap/base.html' %}
+
+{% block title %}
+    {% if title %}{{ title }} - String Theory{% else %}Welcome to String Theory{% endif %}
+{% endblock %}
+
+{% block navbar %}
+<img src="{{url_for('static', filename='header4.jpg')}}" alt="image" width="1440">
+<div class="btn-group btn-group-justified" role="group" >
+    <nav class="navbar navbar-default">
+
+        <ul class="nav nav-tabs nav-justified">
+                <li role="presentation"><a href="{{ url_for('index') }}">About</a></li>
+                {% if current_user.is_authenticated %}
+                <li role="presentation" class="dropdown">
+                        <a class="dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
+                          Resources <span class="caret"></span>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li role="presentation"><a href="{{ url_for('resources') }}">Calendar</a></li>
+                        </ul>
+                </li>
+                {% endif %}
+                <li role="presentation" class="dropdown">
+                        <a class="dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
+                          Knitting Tips <span class="caret"></span>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li role="presentation"><a href="{{ url_for('castOn') }}">Casting On</a></li>
+                            <li role="presentation"><a href="{{ url_for('knitPurl') }}">Knit Stitch</a></li>
+                        </ul>
+                </li>
+                <li role="presentation" class="dropdown">
+                    <a class="dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
+                      Crochet Tips <span class="caret"></span>
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li role="presentation"><a href="{{ url_for('chain') }}">Chaining</a></li>
+                        <li role="presentation"><a href="{{ url_for('singleDouble') }}">Single Crochet</a></li>
+                    </ul>
+            </li>
+                {% if current_user.is_anonymous %}
+                <li role="presentation"><a href="{{ url_for('patterns') }}">Patterns</a></li>
+                <li role="presentation"><a href="{{ url_for('login') }}">Login/Register</a></li>
+                {% else %}
+                <li role="presentation" class="dropdown">
+                        <a class="dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
+                          Patterns <span class="caret"></span>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li role="presentation"><a href="{{ url_for('patterns') }}">All Patterns</a></li>
+                            <li role="presentation"><a href="{{ url_for('savedPatterns') }}">My Library</a></li>
+                            <li role="presentation"><a href="{{ url_for('upload') }}">Upload Pattern</a></li>
+                        </ul>
+                </li>
+                <li role="presentation" class="dropdown">
+                        <a class="dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
+                          {{current_user.username}} <span class="caret"></span>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li role="presentation"><a href={{ '/profile/'~current_user.username }}>My Profile</a></li>
+                            <li role="presentation"><a href="{{ url_for('profileForm') }}">Search Profiles</a></li>
+                            <li role="presentation"><a href="{{ url_for('logout') }}">Logout</a></li>
+                        </ul>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+</div>
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-info" role="alert">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        {# application content needs to be provided in the app_content block #}
+        {% block app_content %}{% endblock %}
+    </div>
+{% endblock %}
