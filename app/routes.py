@@ -10,6 +10,10 @@ import os.path
 import html
 import datetime
 from io import BytesIO
+import calendar
+import time
+
+# 1575346280
 
 #https://www.youtube.com/watch?v=TLgVEBuQURA (file downloading)
 #https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world (Flask tutorial)
@@ -18,12 +22,18 @@ from io import BytesIO
 #Takes a list and creates a list of lists, each with up to 3 elements
 def groupInThrees(listy):
     numGroups = -(-len(listy) // 3)
+    dictInThrees = {k: [] for k in range(numGroups)}#dict.fromkeys(range(numGroups), []) 
+    print("dictInThrees:",dictInThrees)
     pattsInThrees = [[] for i in range(numGroups)]
     for i in range(numGroups):
         for j in range(3):
             if ((3*(i) + (j)) < len(listy)):
                 pattsInThrees[i].append(listy[3*(i) + (j)])
-    return pattsInThrees
+                dictInThrees[i].append(listy[3*(i) + (j)])
+                print("after dictInThrees[",i,"].append, dictInThrees is:",dictInThrees)
+                print("and dictInThrees[",i,"] is:",dictInThrees[i])
+    print("dictInThrees:",dictInThrees)
+    return dictInThrees
 
 #Filters input through permitted file extensions
 def allowed_pattern(filename):
@@ -68,14 +78,13 @@ def register():
     return render_template('register.html', title='Register', form=form)
 
 #Profile display route - takes username and displays profile
-@app.route('/profile/<username>', methods=['GET','POST'])
-def profile(username):
-    user =  User.query.filter_by(username=username).first()
+@app.route('/profile/<userId>', methods=['GET','POST'])
+def profile(userId):
+    user =  User.query.get(userId)
     if user == None:
         return redirect(url_for('profileForm'))
-    userId = user.id
     comments = Comment.query.filter_by(user_id=userId).all()
-    patterns = User.query.filter_by(username=username).first().uploaded_patterns
+    patterns = User.query.filter_by(id=userId).first().uploaded_patterns
 
     saved = []
     dictionary = {}
@@ -88,7 +97,7 @@ def profile(username):
             else:
                 dictionary[p.id] = "n"
 
-    return render_template('profile.html', title=username+'Profile', savedDict=dictionary, comments=comments, patterns=groupInThrees(patterns), user=user)
+    return render_template('profile.html', title=user.username+"'s Profile", savedDict=dictionary, comments=comments, patterns=groupInThrees(patterns), user=user)
 
 #Displays profile search form
 @app.route('/profileForm')
@@ -100,11 +109,12 @@ def profileForm():
 def profileSearch():
     f = request.form
     username = request.form['username']
+
     user = User.query.filter_by(username=username).first()
     if user == None:
         return render_template('profileForm.html', title='Search Profiles', err=True)
     else:
-        return redirect('/profile/'+user.username)
+        return redirect('/profile/'+str(user.id))
 
 #Login route
 @app.route('/login', methods=['GET', 'POST'])
@@ -185,7 +195,12 @@ def uploadForm():
         #Upload cover image (if attached) to filesystem
         if (('image' in request.files) and allowed_img(imagename)):
             array = imagename.split('.')
-            newFilename = str(Pattern.query.filter_by(filename=filename).first().id) + "." + array[1]
+            ts = calendar.timegm(time.gmtime())
+            print(ts)
+            newFilename = str(Pattern.query.filter_by(filename=filename).first().id) + "." + array[1] + "?" + str(ts)
+            pathToImage = os.path.join(app.config['UPLOAD_FOLDER'], newFilename)
+            if (os.path.exists(pathToImage)):
+                os.unlink(pathToImage)
             image.save(os.path.join(app.config['UPLOAD_FOLDER'], newFilename))
             uploadToDB.image_filename = newFilename
         # else:
@@ -208,13 +223,17 @@ def patterns():
     allPatts = patts.all()
     patternIntersection = allPatts
         
-    #Get list of saved patterns:
-    # saved = []
-    # if (current_user.is_authenticated):
-    #     saved = User.query.filter_by(id=current_user.id).first().saved_patterns
-
     return render_template('patterns.html', title='Patterns', patterns=groupInThrees(patternIntersection), \
         globalDict=globalDict, globalMap=globalMap, saved=False)
+
+@app.route('/viewPattern/<pattId>', methods=['GET','POST'])
+def viewPattern(pattId):
+    p = Pattern.query.get(pattId)
+    if p is None:
+        return redirect(url_for('patterns'))
+        
+    return render_template('viewPattern.html', title=p.name)
+    
 
 #Renders patterns.html with patterns in library
 @app.route('/savedPatterns', methods=['GET', 'POST'])
@@ -279,6 +298,7 @@ def edit(pattId):
 #Receives data from edit form, updates DB, and redirects to patterns
 @app.route('/editForm/<pattId>', methods=['GET', 'POST'])
 def editForm(pattId):
+    print ('entered editForm route')
     if not current_user.is_authenticated:
         return redirect(url_for('login'))
 
@@ -286,12 +306,28 @@ def editForm(pattId):
     if not (current_user.id == p.user_id or current_user.username == "admin"):
         return redirect(url_for('patterns'))
 
+    image = request.files['image']
+    imagename = secure_filename(image.filename)
+
+    if (('image' in request.files) and allowed_img(imagename)):
+        print('image was in request.files in /editForm/<pattId>')
+        ts = calendar.timegm(time.gmtime())
+        print(ts)
+        array = imagename.split('.')
+        newFilename = str(pattId) + "." + array[1] + "?" + str(ts)
+
+        image.save(os.path.join(app.config['UPLOAD_FOLDER'], newFilename))
+        p.image_filename = newFilename
+    
     f = request.form
     tags = []
-
     for key in f.keys():
         if key == 'name':
-            p.name = f[key]
+            if (f[key] is not "") and (f[key] is not None):
+                p.name = f[key]
+            else:
+                array = p.filename.split('.')
+                p.name = array[0]
         elif key == 'description':
             p.description = f[key]
         else:
@@ -301,8 +337,8 @@ def editForm(pattId):
         p.tags = []
         for t in tags:
             p.tags.append(Tag.query.filter_by(label=t).first())
-    db.session.commit()
 
+    db.session.commit()
     return redirect(url_for('patterns'))
 
 #Receives signal from delete button, deletes pattern from DB, and redirects to patterns route
@@ -319,9 +355,10 @@ def delete(pattId):
     for c in comments:
         db.session.delete(c)
     
-    pathToImage = os.path.join(app.config['UPLOAD_FOLDER'], p.image_filename)
-    if (os.path.exists(pathToImage)):
-        os.unlink(pathToImage)
+    if not (p.image_filename == None or p.image_filename == ""):
+        pathToImage = os.path.join(app.config['UPLOAD_FOLDER'], p.image_filename)
+        if (os.path.exists(pathToImage)):
+            os.unlink(pathToImage)
 
     db.session.delete(p)
     db.session.commit()
@@ -409,7 +446,10 @@ def manage():
     if not (current_user.is_authenticated and current_user.username == "admin"):
         return redirect(url_for('index'))
 
-    return render_template('manage.html', title="Manage")
+    patterns = Pattern.query.all()
+    users = User.query.all()
+
+    return render_template('manage.html', title="Manage", patterns=patterns, users=users)
 
 
 #Routes for knitting/crochet tutorials

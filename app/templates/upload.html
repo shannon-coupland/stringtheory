@@ -4,12 +4,12 @@
     <h1>{{ title }}</h1>
     <form {% if edit %}action={{'/editForm/'~p.id}}{% else %}action='/uploadForm'{% endif %} method="post" enctype="multipart/form-data">
 
-        <h4>Pattern Title</h4> <input class="form-control" type="text" name="name" {% if edit %}value='{{p.name}}' required{% endif %}><br>
+        <h4>Pattern Title</h4> <input class="input-sm form-control" type="text" name="name" {% if edit %}value='{{p.name}}'{% endif %}><br>
+        <h4>Description (optional; limit 1000 characters)</h4><input class="input-lg form-control" type="text" name="description" {% if (edit) and (not p.description == None) %}value='{{p.description}}'{% endif %}><br>
         {% if not edit %}
-        <h4>File Upload (.txt, .pdf, .png, .jpg, .jpeg)</h4> <input class="form-control-file" type="file" name="file" required><br><br>
-        <h4>Cover Image (optional; .png, .jpg, .jpeg)</h4><input class="form-control-file" type="file" name="image"><br><br>
+        <h4>Pattern Upload (.txt, .pdf, .png, .jpg, .jpeg)</h4> <input class="form-control-file" type="file" name="file" {% if not edit %}required{% endif %}><br>
         {% endif %}
-        <h4>Description (optional; limit 1000 characters)</h4><input class="input-lg form-control" type="text" name="description" {% if (edit) and (not p.description == None) %}value='{{p.description}}'{% endif %}><br><br>
+        <h4>Cover Image (optional; .png, .jpg, .jpeg)</h4><input class="form-control-file" type="file" name="image"><br>
         
         <h4>Tags</h4>
                     {% if filtered %}
@@ -25,7 +25,7 @@
                     {% endif %}
                     {% for key in globalDict %}
                         <div style="display: inline-block;">
-                            <h4>{{globalMap[tag]}}{{ globalMap[key] }}</h4>
+                            <h4>{{ globalMap[tag] }}{{ globalMap[key] }}</h4>
                             {% for tag in globalDict[key] %}
                                 <input type="checkbox" id={{tag}} name={{tag}} value={{tag}} {% if tag in tags %}checked{% endif %}>
                                 <label for={{tag}}>{{globalMap[tag]}}</label><br>

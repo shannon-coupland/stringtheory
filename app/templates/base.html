@@ -5,7 +5,7 @@
 {% endblock %}
 
 {% block navbar %}
-<img src="{{url_for('static', filename='header4.jpg')}}" alt="image" width="1440">
+<img src="{{url_for('static', filename='header4.jpg')}}" alt="image" width="100%">
 <div class="btn-group btn-group-justified" role="group" >
     <nav class="navbar navbar-default">
 
@@ -62,7 +62,7 @@
                             {% if current_user.username == 'admin' %}
                             <li role="presentation"><a href="{{ url_for('manage') }}"">Manage Site</a></li>
                             {% endif %}
-                            <li role="presentation"><a href={{ '/profile/'~current_user.username }}>My Profile</a></li>
+                            <li role="presentation"><a href={{ '/profile/'~current_user.id }}>My Profile</a></li>
                             <li role="presentation"><a href="{{ url_for('profileForm') }}">Search Profiles</a></li>
                             <li role="presentation"><a href="{{ url_for('logout') }}">Logout</a></li>
                         </ul>
