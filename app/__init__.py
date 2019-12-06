@@ -8,11 +8,13 @@ import os
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_FOLDER = os.path.join(basedir,'static/images/')
+PATTERN_UPLOAD_FOLDER = os.path.join(basedir,'static/patterns/')
 ALLOWED_PATTERN_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 ALLOWED_IMG_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['PATTERN_UPLOAD_FOLDER'] = PATTERN_UPLOAD_FOLDER
 app.config.from_object(Config)
 db = SQLAlchemy(app)
 

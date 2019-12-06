@@ -13,7 +13,7 @@ from io import BytesIO
 import calendar
 import time
 
-pattsPerRow = 4
+pattsPerRow = 3
 
 #https://www.youtube.com/watch?v=TLgVEBuQURA (file downloading)
 #https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world (Flask tutorial)
@@ -175,13 +175,12 @@ def uploadForm():
     for key in formVals.keys():
         if key in globalDict:
             tags.append(key)
-    # tags.remove('name')
-    # tags.remove('description')
     storeTags(tags)
 
     #If filename is good, upload new pattern to database
     if allowed_pattern(filename):
         uploadToDB = Pattern(file=file.read(), filename=filename, owner=current_user)
+        file.save(os.path.join(app.config['PATTERN_UPLOAD_FOLDER'], filename))
 
         if ('name' in request.files):
             uploadToDB.name = name
@@ -196,7 +195,6 @@ def uploadForm():
         if (('image' in request.files) and allowed_img(imagename)):
             array = imagename.split('.')
             ts = calendar.timegm(time.gmtime())
-            print(ts)
             newFilename = str(Pattern.query.filter_by(filename=filename).first().id) + "." + array[1] + "?" + str(ts)
             pathToImage = os.path.join(app.config['UPLOAD_FOLDER'], newFilename)
             if (os.path.exists(pathToImage)):
@@ -232,7 +230,7 @@ def viewPattern(pattId):
     if p is None:
         return redirect(url_for('patterns'))
         
-    return render_template('viewPattern.html', title=p.name)
+    return render_template('viewPattern.html', title=p.name, p=p)
     
 
 #Renders patterns.html with patterns in library
@@ -310,12 +308,13 @@ def editForm(pattId):
     imagename = secure_filename(image.filename)
 
     if (('image' in request.files) and allowed_img(imagename)):
-        print('image was in request.files in /editForm/<pattId>')
+        pathToImage = os.path.join(app.config['UPLOAD_FOLDER'], p.image_filename)
+        if (os.path.exists(pathToImage)):
+            os.unlink(pathToImage)
+
         ts = calendar.timegm(time.gmtime())
-        print(ts)
         array = imagename.split('.')
         newFilename = str(pattId) + "." + array[1] + "?" + str(ts)
-
         image.save(os.path.join(app.config['UPLOAD_FOLDER'], newFilename))
         p.image_filename = newFilename
     
@@ -359,6 +358,10 @@ def delete(pattId):
         pathToImage = os.path.join(app.config['UPLOAD_FOLDER'], p.image_filename)
         if (os.path.exists(pathToImage)):
             os.unlink(pathToImage)
+
+    pathToFile = os.path.join(app.config['PATTERN_UPLOAD_FOLDER'], p.filename)
+    if (os.path.exists(pathToFile)):
+        os.unlink(pathToFile)
 
     db.session.delete(p)
     db.session.commit()
