@@ -13,7 +13,7 @@ from io import BytesIO
 import calendar
 import time
 
-# 1575346280
+pattsPerRow = 4
 
 #https://www.youtube.com/watch?v=TLgVEBuQURA (file downloading)
 #https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world (Flask tutorial)
@@ -21,15 +21,15 @@ import time
 
 #Takes a list and creates a list of lists, each with up to 3 elements
 def groupInThrees(listy):
-    numGroups = -(-len(listy) // 3)
+    numGroups = -(-len(listy) // pattsPerRow)
     dictInThrees = {k: [] for k in range(numGroups)}#dict.fromkeys(range(numGroups), []) 
     print("dictInThrees:",dictInThrees)
     pattsInThrees = [[] for i in range(numGroups)]
     for i in range(numGroups):
-        for j in range(3):
-            if ((3*(i) + (j)) < len(listy)):
-                pattsInThrees[i].append(listy[3*(i) + (j)])
-                dictInThrees[i].append(listy[3*(i) + (j)])
+        for j in range(pattsPerRow):
+            if ((pattsPerRow*(i) + (j)) < len(listy)):
+                pattsInThrees[i].append(listy[pattsPerRow*(i) + (j)])
+                dictInThrees[i].append(listy[pattsPerRow*(i) + (j)])
                 print("after dictInThrees[",i,"].append, dictInThrees is:",dictInThrees)
                 print("and dictInThrees[",i,"] is:",dictInThrees[i])
     print("dictInThrees:",dictInThrees)
